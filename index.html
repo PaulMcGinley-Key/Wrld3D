@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+  <head>
+    <title>WRLD Rebuild No. 7</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+	
+    <script src="https://cdn-webgl.wrld3d.com/wrldjs/dist/latest/wrld.js"></script>
+    <script src="https://cdn-webgl.wrld3d.com/wrldjs/addons/marker_controller/latest/marker_controller.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.1/leaflet.css" rel="stylesheet" />
+    <link href="https://cdn-webgl.wrld3d.com/wrldjs/addons/resources/latest/css/wrld.css" rel="stylesheet"/>
+    <style>
+      html, body, #map {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+  </body>
+  
+  <script>
+    // Define WRLD map object
+    var map = L.Wrld.map("map", "ea90b94e18b23b97517bbf84b3c7a7e4", {
+      center: [33.8753545835484, 35.5320677527738], // These are the GPS values for the building.
+      zoom: 17,
+      indoorsEnabled: true, // Needed to allow the viewing of the inside of the buildings.,
+      trafficEnabled: false,
+      displayEntranceMarkers: false,
+      animate: false
+    });
+	
+    map.on("initialstreamingcomplete", onInitialStreamingComplete);
+    function onInitialStreamingComplete() {
+      map.indoors.enter("EIM-a20835e1-fe7a-4dc8-90c9-a2397bec762c"); // ID of the indoor floor to enter.
+
+      L.Wrld.indoorMapEntities
+        .indoorMapEntityInformation("EIM-a20835e1-fe7a-4dc8-90c9-a2397bec762c")
+        .addTo(map);
+    }
+	
+    map.indoorMapEntities.on("indoormapentityinformationchanged", onIndoorMapEntityInformationChanged);
+    function onIndoorMapEntityInformationChanged(event) {
+      markers.forEach(function(marker) { marker.remove(); });
+      
+	  markers = [];
+	  var indoorMapEntityInformation = event.indoorMapEntityInformation;
+	  var indoorMapId = indoorMapEntityInformation.getIndoorMapId();
+	  var loadState = indoorMapEntityInformation.getLoadState();
+	  var indoorMapEntitiesAll = indoorMapEntityInformation.getIndoorMapEntities();
+
+      var indoorMapEntities = $.grep( indoorMapEntitiesAll, function(o, i) {
+        return config.rooms.find(r => r.wrldId==o.getIndoorMapEntityId())
+      });
+	  
+	  indoorMapEntities.forEach(function(entity) {
+        var indoorMapEntityId = entity.getIndoorMapEntityId();
+        var indoorMapFloorId = entity.getIndoorMapFloorId();
+        var position = entity.getPosition();
+        var marker = addMarker(position, indoorMapEntityId, indoorMapId, indoorMapFloorId);
+        var room = config.rooms.find(r => r.wrldId == indoorMapEntityId);
+        room.marker = marker;
+      });
+
+      updateRoomsInformation();
+    }
+	
+    // WRLD Building configuration:
+    var config = {
+      rooms: [ // This will be added to wrld and be populated by liquid
+        {wrldId: 1117, sensorLocationId: '17174d8e-2bac-44d4-b632-1de6ca887987', deviceId: 'a1bc4d52-6e64-425f-89a1-5bc037faa6f6', keystoneId: 'TBD', name: 'Kitchen', floor: 0, markerPlacement: [33.875624, 35.5320031], roomTags: ['Public Area'] },
+        {wrldId: 1005, sensorLocationId: '2f61ece7-11e6-47d7-929b-c39a5e5b5e89', deviceId: '3bee2064-8df9-4b01-a67c-4ebaf4f52b4b', keystoneId: 'TBD', name: 'Library', floor: 0, markerPlacement: [33.8755486, 35.5322173], roomTags: ['Public Area'] },
+        {wrldId: 1121, sensorLocationId: '63d59d09-200d-468e-b6ea-e6a65a058576', deviceId: 'f60a0fb9-1227-4f31-b403-dbe0bc9909a4', keystoneId: 'TBD', name: 'Common Area C', floor: 0, markerPlacement: [33.8754147, 35.5321514], roomTags: ['Common Area'] },	
+        {wrldId: 1123, sensorLocationId: 'f653ba31-7a57-45ac-8292-e483c8607e15', deviceId: '05ed2c4c-aead-483d-af34-38c58e12ac5c', keystoneId: 'TBD', name: 'Common Area B', floor: 0, markerPlacement: [33.8753656, 35.5320139], roomTags: ['Common Area'] },
+        {wrldId: 1124, sensorLocationId: 'fca420dc-190a-40c7-b8f1-37c257e7034e', deviceId: '03fe8a63-fedc-46f8-bf1b-45528f704059', keystoneId: 'TBD', name: 'Common Area A', floor: 0, markerPlacement: [33.875368, 35.531934], roomTags: ['Common Area'] },
+        {wrldId: 1118, sensorLocationId: '269aec1f-d5b1-4b61-b7ac-a4c70f3f1e57', deviceId: 'd9ed03af-f51b-4421-939d-253ecb977371', keystoneId: 'TBD', name: 'Reception', floor: 0, markerPlacement: [33.8755575, 35.5319638], roomTags: ['Public Area'] },
+        {wrldId: 1056, sensorLocationId: 'a065272c-464f-43d7-922e-bb0b592c886b', deviceId: 'e37db181-1872-47fe-a9a0-48a0e3dbed27', keystoneId: 'TBD', name: 'Tyre', floor: 0, markerPlacement: [33.8754218, 35.5320888], roomTags: ['Meeting Room'] },
+        {wrldId: 1034, sensorLocationId: '611ff57e-190c-418b-9b1e-d6dd0747b607', deviceId: '4ef2f35c-0b43-4cc7-ac32-60c1fc51d307', keystoneId: 'TBD', name: 'Byblos', floor: 0, markerPlacement: [33.8753563, 35.532069], roomTags: ['Meeting Room'] },
+        {wrldId: 1021, sensorLocationId: '7d991fa3-8331-439a-9517-8bdd8e4d1554', deviceId: '675aa8b7-e9fb-4b70-a644-72e91688e03c', keystoneId: 'TBD', name: 'Beirut', floor: 0, markerPlacement: [33.8755005, 35.5319058], roomTags: ['Meeting Room'] },
+        {wrldId: 1018, sensorLocationId: 'ae44b28e-0289-4a6c-8bdf-83a7e70d4274', deviceId: 'f881e501-eedd-4f15-9fbb-6f5c6960919d', keystoneId: 'TBD', name: 'Tripoli', floor: 0, markerPlacement: [33.8754403, 35.5318793], roomTags: ['Meeting Room'] },
+        {wrldId: 1016, sensorLocationId: 'a55be9d1-36f9-4e7c-8bf4-44cfee38b006', deviceId: '0726458c-7480-497f-9f90-d1f30cbc1428', keystoneId: 'TBD', name: 'Baalbeck', floor: 0, markerPlacement: [33.8754596, 35.5319404], roomTags: ['Meeting Room'] }
+      ]
+    };
+	// JSON Result configuration:
+	var SensorReadings = [];
+	/*var SensorReading = {
+	  timeStamp: "",
+	  clientKey: "",
+	  buildingIdentifier: "",
+	  locationIdentifier: "",
+	  temperature: 0,
+	  occupency: 0,
+	  voc: 0,
+	  cO2: 0,
+	  pressure: 0,
+	  humidity: 0,
+	  lux: 0,
+	  noise: 0
+	}*/
+	
+	function GetSensorData() {
+      var xhr = new XMLHttpRequest();
+	  
+      xhr.open("GET", "https://ks-iot.azurewebsites.net/api/LatestReadings/msd/c83033e8-4d82-49d5-a138-c4c3ec4555ae?code=7bFgKQEfY744H90DJTOS9yaaI99iHSZsiXW/Vr897i8kZt0rdTAspQ==", true);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+          let JSONData = JSON.parse(xhr.responseText); // Get JSON data
+		  SensorReadings = JSONData;      
+        }
+      }
+      xhr.send();
+	}
+	GetSensorData();
+	window.setTimeout(GetSensorData, 60000); // Every minute get new data
+	
+	const ReadingType = {
+      TEMPERATURE: 'temperature',
+      OCCUPANCY: 'occupancy',
+      VOC: 'voc',
+      C02: 'cO2',
+      PRESSURE: 'pressure',
+      HUMIDITY: 'humidity',
+      LUX: 'lux',
+      NOISE: 'noise'
+    }
+	var ActiveReading = ReadingType.TEMPERATURE;
+	function HighlightRooms() {
+      map.indoors.clearEntityHighlights();
+	
+      for (var i = 0; i < config.rooms.length; i++) {
+        map.indoors.setEntityHighlights(config.rooms[i].wrldId, GetColourFromValue(ActiveReading, SensorReadings.map(function(e) { return /* Get this param from ActiveReading */ e.temperature; }).indexOf(config.rooms[i].wrldId);));	
+      }      
+	}
+	
+	// Get Colour from value
+	// DEPRECIATED, UPDATE
+    function GetColourFromValue(Param, Value) {
+    // console.log("GetColourFromValue( "+ Param + ", " + Value + ")");
+    
+    try {
+    switch(Param) {
+      case ReadingType.TEMPERATURE:
+        if ( Value == "Very Cold" )
+          return [136,184,228,200];
+        else if ( Value == "Cold" )
+          return [197,223,241,200];
+        else if ( Value == "Fresh" )
+          return [198,240,233,200];
+        else if ( Value == "Optimal" )
+          return [198,239,206,200];
+        else if ( Value == "Warm" )
+          return [255,235,156,200];
+        else if ( Value == "Hot" )
+          return [255,204,102,200];
+        else if ( Value == "Extreme Heat" )
+          return [255,117,133,200];
+        else 
+          return [237,237,237,128];
+      break;
+        
+      case ReadingType.HUMIDITY:
+        if ( Value == "Arid" )
+          return [255,204,102,128];
+        else if ( Value == "Dry" )
+          return [255,235,156,128];
+        else if ( Value == "Optimal" )
+          return [227,247,191,128];
+        else if ( Value == "Moist" )
+          return [198,240,233,200];
+        else if ( Value == "Muggy" )
+          return [197,223,241,200];
+        else 
+          return [237,237,237,128];
+      break;
+        
+      case ReadingType.CO2:
+        if ( Value == "NoData" )
+          return [237,237,237,128];  
+        else 
+          return [237,237,237,128];   
+      break;
+        
+      case ReadingType.NOISE:
+        if ( Value == "Extremely Quiet" || Value == "Normal Breathing" || Value == "Whispering at 5 feet" || Value == "Soft Whisper")
+          return [198,239,206,128];
+        else if ( Value == "Rainfall" || Value == "Normal Conversation" )
+          return [227,247,191,128];
+        else if ( Value == "Hair Dryer, Vacuum" || Value == "Ringing Telephone, Blender"  || Value == "Subway Platform" )
+          return [255,235,156,128];
+        else if ( Value == "Rock Concert" )
+          return [255,204,102,128];
+        else if ( Value == "Shouting in Ear" )
+          return [255,153,0,128];
+        else if ( Value == "Thunder" )
+          return[255,117,133,128];
+        else 
+          return [237,237,237,128];
+        break;
+        
+      case ReadingType.VOC:
+        if ( Value == "High Quality" || Value == "Quality" || Value == "Good")
+          return [198,239,206,128];
+        else if ( Value == "Target" )
+          return [227,247,191,128];
+        else if ( Value == "Upper Band" )
+          return [255,235,156,128];
+        else if ( Value == "Watching" )
+          return [255,204,102,128];
+        else if ( Value == "Warning" )
+          return [255,153,0,128];
+        else if ( Value == "Danger" )
+          return[255,117,133,128];
+        else 
+          return [237,237,237,128];
+        break;
+        
+      case ReadingType.OCCUPANCY:
+        Value = Value.replace('%','')
+        if ( Value < 50 )
+          return [227,247,191,128];
+        else if ( Value == 1 )
+          return[255,117,133,128];
+        else if ( Value >= 0.80 )
+          return [255,153,0,128];
+        else if ( Value >= 0.65 )
+          return [255,204,102,128];
+        else if ( Value >= 0.50 )
+          return [255,235,156,128];
+        else 
+          return [237,237,237,128];
+        break;
+        
+    default:
+    // code block
+    }
+    }
+    catch(err) {
+      console.log(err.message);
+      return [237,237,237,128];
+    }
+  }
+	
+    var markers = [];
+    var markerController = new WrldMarkerController(map);
+	
+    function addMarker(position, indoorMapEntityId, indoorMapId, indoorMapFloorId) {
+      var marker = L.marker(position, {        
+        title: indoorMapEntityId,
+        indoorMapId: indoorMapId,
+        indoorMapFloorId: indoorMapFloorId,
+        elevation : 3
+      }).addTo(map);
+	  
+      marker.bindPopup(indoorMapEntityId);
+      marker.on('mouseover', function (e) {
+        this.openPopup();
+      });
+      marker.on('mouseout', function (e) {
+        this.closePopup();
+      });
+      markers.push(marker);
+	  
+      return marker;
+    }
+	
+	// Camiels
+	/*
+	function updateRoomsInformation() {
+      // ToDo: construct url from config
+      var url="https://ks-iot.azurewebsites.net/api/LatestReadings/msd/c83033e8-4d82-49d5-a138-c4c3ec4555ae?code=7bFgKQEfY744H90DJTOS9yaaI99iHSZsiXW/Vr897i8kZt0rdTAspQ==";
+      $.ajax(url).done(
+        function(results) {
+          var mappedResults = $.grep(results, function(o,i){
+            return config.rooms.find(r => r.sensorLocationId == o.locationIdentifier);
+          });
+		  
+		  mappedResults.forEach(function(m) {
+            var room = config.rooms.find(r => r.sensorLocationId == m.locationIdentifier);
+            room.marker.setPopupContent(getMarkerPopupHtml(m));
+          });
+        }
+	  );
+	  window.setTimeout(updateRoomsInformation, 10000)
+    }
+	*/
+  </script>
+</html>
